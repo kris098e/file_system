@@ -76,8 +76,8 @@ int lfs_getattr( const char *path, struct stat *stbuf ) {
 	/* find struct dir_data for the path  */
 
 
-	if(!root) printf("root is null\n");
-	printf("root dir1 %s\n", root->dirs[0].name);
+	//if(!root) printf("root is null\n");
+	//printf("root dir1 %s\n", root->dirs[0].name);
 	
 	struct dir_file_info *info = find_info(path);
 	if (!info) {
@@ -119,13 +119,15 @@ struct dir_file_info *find_info(const char *path) {
 	if (!info) {
 		return NULL;
 	}
+	printf("1");
 	char *not_const_path = malloc(sizeof(char) * strlen(path));
 	if (!not_const_path) {
 		free(info);
 		return NULL;
 	}
+	printf("2");
 	strcpy(not_const_path, path);
-
+	printf("3");
 	// check if root dir 
 	if (strcmp(path, "/") == 0) {
 		info->is_dir = 1;
@@ -133,13 +135,14 @@ struct dir_file_info *find_info(const char *path) {
 		info->item = root;
 		return info;
 	}
+	printf("4");
 	info->found = 0;
 	info->item = NULL;
 	int n_tokens = 0;
 
 	for (int i = 0; i < strlen(path); ++i) 
 		if (path[i] == '/') n_tokens++;
-
+	printf("5");
 	
 
 	char **tokens = extract_tokens(not_const_path, n_tokens);
@@ -148,7 +151,7 @@ struct dir_file_info *find_info(const char *path) {
 		free(info);
 		return NULL;
 	}
-	
+	printf("6");
 	char *token;
 
 	int succeded, i; 	
@@ -162,9 +165,11 @@ struct dir_file_info *find_info(const char *path) {
 			}	
 		}	
 	}
+	printf("7");
 	
 	free(not_const_path);
 	free(tokens);
+	printf("8");
 	return info;
 }
 
@@ -254,7 +259,7 @@ int lfs_readdir( const char *path, void *buf, fuse_fill_dir_t filler, off_t offs
 }
 
 int lfs_mkdir(const char *path, mode_t mode) {
-	int i, j, n_tokens;
+	int i, n_tokens;
 	n_tokens = 0;
 
 	printf("IN MKDIR: %s\n", path);
@@ -311,24 +316,26 @@ int lfs_mkdir(const char *path, mode_t mode) {
 	if (!info->is_dir) {
 		free(info);
 		free(creation_path);
+		free(not_const_path);
 		return -ENOENT;
 	} else {
 		struct dir_data *dir = (struct dir_data *) info->item;
 		if (dir->dir_count >= dir->dir_max_size && dir->dir_count < INT_MAX) {
-			if (!realloc(dir->dirs, dir->dir_max_size*10)) {
-				free(creation_path);
-				free(info);
-				return -ENOMEM;
-			}
+			printf("IN IF on line 318\n");
+			
+			//TODO: deletes all other directories for the dir. 
+			realloc(dir->dirs, dir->dir_max_size*10);
 			dir->dir_max_size = dir->dir_max_size*10;
 		}  
 		if (make_dir(dir, tokens[n_tokens], mode) != 0) {
 			free(creation_path);
+			free(not_const_path);
 			free(info);
 			return -ENOMEM;
 		}
 
 		free(creation_path);
+		free(not_const_path);
 		free(info);
 		return 0;
 	} 
@@ -363,8 +370,8 @@ int make_dir(struct dir_data *dir, char *name, mode_t mode) {
 	new_dir->mode = mode;
 	
 	// insert new dir in parent dir
-	dir->dir_count++;
 	dir->dirs[dir->dir_count] = *new_dir;
+	dir->dir_count++;
 	return 0;
 }
 
@@ -405,15 +412,19 @@ int lfs_release(const char *path, struct fuse_file_info *fi) {
 
 int main( int argc, char *argv[] ) {
 	root = malloc(sizeof(struct dir_data));
-	root->dir_count = 1;
+	root->dir_count = 0;
 	root->dirs = malloc(sizeof(struct dir_data*) * 10); // base size of 10
 	root->file_count = 0;
 	root->files = malloc(sizeof(struct inode*) * 10); // base size of 10
 	root->name = "/";
+	root->dir_max_size = 10;
+	root->file_max_size = 10;
 	root->mode = __S_IFDIR | 0755;
 
+	/**
 	root->dirs[0].name = "hej";
 	root->dirs[0].dir_count = 1;
+	*/
 
 	fuse_main( argc, argv, &lfs_oper );
 
