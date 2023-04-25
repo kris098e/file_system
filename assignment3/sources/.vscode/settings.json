@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "bitset": "c",
+        "chrono": "c",
+        "typeinfo": "c",
+        "*.tcc": "c",
+        "cmath": "c",
+        "functional": "c",
+        "random": "c",
+        "regex": "c",
+        "type_traits": "c"
+    }
+}
