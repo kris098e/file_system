@@ -7,12 +7,12 @@
 
 int lfs_getattr(const char *, struct stat *);
 int lfs_readdir(const char *, void *, fuse_fill_dir_t, off_t, struct fuse_file_info *);
-int lfs_open(const char * path, struct fuse_file_info *);
-int lfs_read(const char * path, char *, size_t, off_t, struct fuse_file_info *);
+int lfs_open(const char *path, struct fuse_file_info *);
+int lfs_read(const char *path, char *, size_t, off_t, struct fuse_file_info *);
 int lfs_release(const char *path, struct fuse_file_info *fi);
 int lfs_mkdir(const char *path, mode_t mode);
 int lfs_mknod(const char *path, mode_t mode, dev_t dev);
-int lfs_write(const char * path, const char *buf, size_t size, off_t offset, struct fuse_file_info * fi);
+int lfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
 
 static struct fuse_operations lfs_oper = {
 	.getattr = lfs_getattr,
@@ -27,8 +27,7 @@ static struct fuse_operations lfs_oper = {
 	.release = NULL,
 	.write = lfs_write,
 	.rename = NULL,
-	.utime = NULL
-};
+	.utime = NULL};
 
 struct inode
 { // used like the Inode of the specific file
@@ -47,9 +46,10 @@ struct dir_data
 	struct dir_data *dirs; // could use dynamic, see https://stackoverflow.com/questions/3536153/c-dynamically-growing-array. Each dir has the option of having its own dir.
 	struct inode *files;   // could use dynamic
 	int dir_count;
-	int dir_max_size;
+	int current_dir_max_size;
 	int file_init_size;
 	int file_count;
+	int current_file_max_size;
 	__mode_t mode;
 };
 
@@ -71,17 +71,12 @@ int make_dir(struct dir_data *dir, char *name);
 int make_nod(struct dir_data *dir, char *name);
 int make_content(const char *path, mode_t mode, int is_file);
 
-
 int lfs_getattr(const char *path, struct stat *stbuf)
 {
 	int res = 0;
 	printf("getattr: (path=%s)\n", path);
 
 	memset(stbuf, 0, sizeof(struct stat));
-	/* find struct dir_data for the path  */
-
-	// if(!root) printf("root is null\n");
-	// printf("root dir1 %s\n", root->dirs[0].name);
 
 	struct dir_file_info *info = find_info(path);
 	if (!info)
@@ -94,11 +89,10 @@ int lfs_getattr(const char *path, struct stat *stbuf)
 	{
 		struct dir_data *dir = (struct dir_data *)info->item;
 		printf("in read dir\n");
-		// stbuf->st_mode = __S_IFDIR | 0755;
 		stbuf->st_mode = dir->mode;
 		stbuf->st_nlink = 2 + dir->dir_count;
-		// file
 	}
+	// file
 	else if (info->found && !info->is_dir)
 	{
 		printf("in read file\n");
@@ -166,7 +160,7 @@ struct dir_file_info *find_info(const char *path)
 	info->found = 0;
 	info->item = NULL;
 	int n_tokens = 0;
-	
+
 	for (int i = 0; i < strlen(path); ++i)
 		if (path[i] == '/')
 			n_tokens++;
@@ -187,12 +181,13 @@ struct dir_file_info *find_info(const char *path)
 	int succeded, i;
 
 	printf("Path for tokens: %s\n", path);
-	for (int k = 0; k < n_tokens; k++) {
+	for (int k = 0; k < n_tokens; k++)
+	{
 		printf("token[%i] = %s\n", k, tokens[k]);
 	}
 
 	printf("6.1\n");
-	for (i = 0; i < n_tokens; i++) 
+	for (i = 0; i < n_tokens; i++)
 	{
 		printf("6.2\n");
 		token = tokens[i];
@@ -203,7 +198,8 @@ struct dir_file_info *find_info(const char *path)
 			printf("6.4\n");
 			check_is_file(token, dir, info, (i == n_tokens - 1));
 		}
-		if(succeded && (i == n_tokens - 1)) {
+		if (succeded && (i == n_tokens - 1))
+		{
 			info->found = 1;
 		}
 		printf("6.5\n");
@@ -282,12 +278,13 @@ char **extract_tokens(char *path, int n_tokens)
 	return result;
 }
 
-int lfs_mkdir(const char *path, mode_t mode) {
+int lfs_mkdir(const char *path, mode_t mode)
+{
 	return make_content(path, mode, 0);
 }
 
-
-int lfs_mknod(const char *path, mode_t mode, dev_t dev) {
+int lfs_mknod(const char *path, mode_t mode, dev_t dev)
+{
 	return make_content(path, mode, 1);
 }
 
@@ -371,7 +368,7 @@ int make_content(const char *path, mode_t mode, int is_file)
 	int remove_extra_slash = n_tokens == 1 ? 0 : -1;
 
 	// Add space for terminating byte, and get parent dir of current dir
-	// /foo/bar - /bar = /foo + '\0' = /foo\0 
+	// /foo/bar - /bar = /foo + '\0' = /foo\0
 	char *creation_path = malloc((strlen(path) - strlen(tokens[n_tokens - 1]) + 1 + remove_extra_slash) * sizeof(char));
 	if (!creation_path)
 	{
@@ -384,7 +381,7 @@ int make_content(const char *path, mode_t mode, int is_file)
 	printf("123\n");
 	printf("deb 1. strlen(path) - strlen(tokens[n_tokens-1]): %zd\n", strlen(path) - strlen(tokens[n_tokens - 1]));
 	printf("deb 1. strlen(path): %zd, strlen(tokens[n_tokens-1]): %zd\n", strlen(path), strlen(tokens[n_tokens - 1]));
-	
+
 	// copy parent dir of current dir over in creation_path
 	memcpy(creation_path, path, (strlen(path) - strlen(tokens[n_tokens - 1]) + remove_extra_slash));
 	// add null-terminating byte to creation_path
@@ -412,15 +409,19 @@ int make_content(const char *path, mode_t mode, int is_file)
 		struct dir_data *dir = (struct dir_data *)info->item;
 		printf("5.1222 \n");
 
-		// if (dir->file_count >= dir->file_init_size && dir->dir_count < INT_MAX)
-		// {
-		// 	printf("IN IF on line 318\n");
-		// 	dir->dirs = realloc(dir->dirs, dir->dir_max_size * 10);
-		// 	if (!dir->dirs) {
-		// 		return -ENOMEM;
-		// 	}
-		// 	dir->dir_max_size = dir->dir_max_size * 10;
-		// }
+		if (dir->file_count >= dir->current_file_max_size && dir->current_file_max_size * 10 < INT_MAX)
+		{
+			dir->files = realloc(dir->files, dir->current_file_max_size * 10);
+			if (!dir->files)
+			{
+				return -ENOMEM;
+			}
+			dir->current_file_max_size = dir->current_file_max_size * 10;
+		}
+		else if (dir->file_count >= dir->current_file_max_size && dir->current_file_max_size * 10 > INT_MAX)
+		{
+			return -ENOMEM;
+		}
 
 		if (make_nod(dir, tokens[n_tokens - 1]) != 0)
 		{
@@ -443,14 +444,19 @@ int make_content(const char *path, mode_t mode, int is_file)
 		struct dir_data *dir = (struct dir_data *)info->item;
 		printf("5. \n");
 
-		if (dir->dir_count >= dir->dir_max_size && dir->dir_count < INT_MAX)
+		if (dir->dir_count >= dir->current_dir_max_size && dir->current_dir_max_size * 10 < INT_MAX)
 		{
 			printf("IN IF on line 318\n");
-			dir->dirs = realloc(dir->dirs, dir->dir_max_size * 10);
-			if (!dir->dirs) {
+			dir->dirs = realloc(dir->dirs, dir->current_dir_max_size * 10);
+			if (!dir->dirs)
+			{
 				return -ENOMEM;
 			}
-			dir->dir_max_size = dir->dir_max_size * 10;
+			dir->current_dir_max_size = dir->current_dir_max_size * 10;
+		}
+		else if (dir->dir_count >= dir->current_dir_max_size && dir->current_dir_max_size * 10 > INT_MAX)
+		{
+			return -ENOMEM;
 		}
 		printf("6. \n");
 
@@ -514,10 +520,11 @@ int make_dir(struct dir_data *dir, char *name)
 		return -ENOMEM;
 	}
 	new_dir->dir_count = 0;
-	new_dir->dir_max_size = 10;
+	new_dir->current_dir_max_size = 10;
 	new_dir->file_init_size = 10;
 	new_dir->file_count = 0;
 	new_dir->mode = __S_IFDIR | 0755;
+	new_dir->current_file_max_size = 10;
 
 	// insert new dir in parent dir
 	dir->dirs[dir->dir_count] = *new_dir;
@@ -552,15 +559,9 @@ int make_nod(struct dir_data *dir, char *name)
 	new_file->modify_time = time(NULL);
 	new_file->mode = __S_IFDIR | 0755;
 
-	new_file->content = calloc(dir->file_init_size, sizeof(char));
-	if (!new_file->content)
-	{
-		free(malloced_name);
-		printf("new_files -> fucked up\n");
-		return -ENOMEM;
-	}
+	new_file->content = NULL;
 	new_file->size_allocated = dir->file_init_size;
-	new_file->content_size = dir->file_init_size;
+	new_file->content_size = 0;
 
 	// insert new file in parent dir
 	dir->files[dir->file_count] = *new_file;
@@ -569,16 +570,16 @@ int make_nod(struct dir_data *dir, char *name)
 	return 0;
 }
 
-
 // Permission
 int lfs_open(const char *path, struct fuse_file_info *fi)
-{	
+{
 	printf("Opening path: %s\n", path);
 	struct dir_file_info *info = find_info(path);
-	if (info->found && !info->is_dir) {
-		struct inode* file = (struct inode*) info->item;
+	if (info->found && !info->is_dir)
+	{
+		struct inode *file = (struct inode *)info->item;
 		// might type cast file obj? to uint64_t
-		fi->fh = (uint64_t) file;
+		fi->fh = (uint64_t)file;
 		return 0;
 	}
 	printf("Leaving open\n");
@@ -589,50 +590,39 @@ int lfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse
 {
 	printf("read: (path=%s)\n", path);
 
-	struct inode* file = (struct inode*) fi->fh;
-	if (!file) {
+	struct inode *file = (struct inode *)fi->fh;
+	if (!file)
+	{
 		return -ENOENT;
 	}
 	printf("Reading file, name: %s, content: %s\n", file->name, file->content);
-	
-	/**
-	struct dir_file_info *file_info = find_info(path);
-	if (!file_info)
-	{
-		return -ENOMEM;
-	}
-
-	if (!file_info->found || file_info->is_dir)
-		return -ENOENT;
-	
-	struct inode *file = (struct inode *)file_info->item;
-	*/
 
 	size = (size + offset) > file->content_size ? file->content_size : size;
 
-	memcpy(buf, file->content + offset, size);
+	memcpy(buf, file->content + offset, file->content_size - offset);
+	buf[4] = '\0'; 
 
 	// free(file_info);
 	return size;
 }
 
-int lfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+int lfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+{
 	printf("write: (path=%s)\n", path);
 
-	struct inode* file = (struct inode*) fi->fh;
-	if (!file) {
+	struct inode *file = (struct inode *)fi->fh;
+	if (!file)
+	{
 		return -ENOENT;
 	}
-	if (file->size_allocated <= size + offset) {
-		while (file->size_allocated <= size + offset) {
-			file->size_allocated = file->size_allocated*10;
-		}
-		file->content = realloc(file->content, file->size_allocated);
-		if (!file->content) return -ENOMEM;
-		file->content_size = size + offset;
-		file->content[file->content_size] = '\0';
-	}
-	
+
+	file->content = realloc(file->content, size);
+	if (!file->content)
+		return -ENOMEM;
+	file->content_size = size;
+	printf("realloc file size bro!!\n");
+
+
 	// file->content + offset to append new content
 	memcpy(file->content + offset, buf, size);
 
@@ -653,9 +643,10 @@ int main(int argc, char *argv[])
 	root->file_count = 0;
 	root->files = malloc(sizeof(struct inode) * 10); // base size of 10
 	root->name = "/";
-	root->dir_max_size = 10;
+	root->current_dir_max_size = 10;
 	root->file_init_size = 10;
 	root->mode = __S_IFDIR | 0755;
+	root->current_file_max_size = 10;
 
 	/**
 	root->dirs[0].name = "hej";
