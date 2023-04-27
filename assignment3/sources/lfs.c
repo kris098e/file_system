@@ -539,7 +539,7 @@ int make_nod(struct dir_data *dir, char *name)
 	new_file->modify_time = time(NULL);
 	new_file->mode = __S_IFDIR | 0755;
 
-	new_file->content = malloc(sizeof(char) * dir->file_init_size);
+	new_file->content = calloc(dir->file_init_size, sizeof(char));
 	if (!new_file->content)
 	{
 		free(malloced_name);
