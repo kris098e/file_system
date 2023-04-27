@@ -7,26 +7,28 @@
 
 int lfs_getattr(const char *, struct stat *);
 int lfs_readdir(const char *, void *, fuse_fill_dir_t, off_t, struct fuse_file_info *);
-int lfs_open(const char *, struct fuse_file_info *);
-int lfs_read(const char *, char *, size_t, off_t, struct fuse_file_info *);
+int lfs_open(const char * path, struct fuse_file_info *);
+int lfs_read(const char * path, char *, size_t, off_t, struct fuse_file_info *);
 int lfs_release(const char *path, struct fuse_file_info *fi);
 int lfs_mkdir(const char *path, mode_t mode);
+int lfs_mknod(const char *path, mode_t mode, dev_t dev);
+int lfs_write(const char * path, const char *buf, size_t size, off_t offset, struct fuse_file_info * fi);
 
 static struct fuse_operations lfs_oper = {
 	.getattr = lfs_getattr,
 	.readdir = lfs_readdir,
-	.mknod = NULL,
+	.mknod = lfs_mknod,
 	.mkdir = lfs_mkdir,
 	.unlink = NULL,
 	.rmdir = NULL,
 	.truncate = NULL,
-	.open = NULL,
-	.read = NULL,
+	.open = lfs_open,
+	.read = lfs_read,
 	.release = NULL,
-	.write = NULL,
+	.write = lfs_write,
 	.rename = NULL,
 	.utime = NULL
-	};
+};
 
 struct inode
 { // used like the Inode of the specific file
@@ -35,7 +37,8 @@ struct inode
 	__time_t modify_time;
 	__mode_t mode;
 	char *content;
-	int size;
+	int size_allocated;
+	int content_size;
 };
 
 struct dir_data
@@ -45,7 +48,7 @@ struct dir_data
 	struct inode *files;   // could use dynamic
 	int dir_count;
 	int dir_max_size;
-	int file_max_size;
+	int file_init_size;
 	int file_count;
 	__mode_t mode;
 };
@@ -59,13 +62,15 @@ struct dir_file_info
 
 struct dir_data *root;
 
-char *strtok(char *str, const char *delim);
 struct dir_file_info *find_info(const char *path);
 void check_is_file(char *token, struct dir_data *dir, struct dir_file_info *info, int is_last_token);
 int check_is_dir(char *token, struct dir_data **dir, struct dir_file_info *info);
 char **extract_tokens(char *path, int n_tokens);
 char *strcat(char *dest, const char *src);
 int make_dir(struct dir_data *dir, char *name);
+int make_nod(struct dir_data *dir, char *name);
+int make_content(const char *path, mode_t mode, int is_file);
+
 
 int lfs_getattr(const char *path, struct stat *stbuf)
 {
@@ -103,7 +108,7 @@ int lfs_getattr(const char *path, struct stat *stbuf)
 		stbuf->st_nlink = 1;
 		stbuf->st_atime = file->access_time;
 		stbuf->st_mtime = file->modify_time;
-		stbuf->st_size = file->size;
+		stbuf->st_size = file->size_allocated;
 	}
 	else
 		res = -ENOENT;
@@ -277,6 +282,15 @@ char **extract_tokens(char *path, int n_tokens)
 	return result;
 }
 
+int lfs_mkdir(const char *path, mode_t mode) {
+	return make_content(path, mode, 0);
+}
+
+
+int lfs_mknod(const char *path, mode_t mode, dev_t dev) {
+	return make_content(path, mode, 1);
+}
+
 int lfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
 	// (void) offset;
@@ -317,7 +331,7 @@ int lfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 	return 0;
 }
 
-int lfs_mkdir(const char *path, mode_t mode)
+int make_content(const char *path, mode_t mode, int is_file)
 {
 	int i, n_tokens;
 	n_tokens = 0;
@@ -379,13 +393,13 @@ int lfs_mkdir(const char *path, mode_t mode)
 	printf("creationpath: %s\n", creation_path);
 
 	struct dir_file_info *info = find_info(creation_path);
-	if (!info)
+	if (!info->found)
 	{
 		free(creation_path);
 		free(tokens);
 		free(not_const_path);
 		printf("info couldn't be allocated\n");
-		return -ENOMEM;
+		return -ENOENT;
 	}
 
 	printf("4. \n");
@@ -393,16 +407,28 @@ int lfs_mkdir(const char *path, mode_t mode)
 	printf("MKDIR INFO FOUND %s\n", ((struct dir_data *)(info->item))->name);
 	printf("tokens %s\n", tokens[0]);
 
-	if (!info->is_dir)
+	if (is_file) // make file
 	{
-		printf("4.1 \n");
-		free(info);
-		free(tokens);
+		struct dir_data *dir = (struct dir_data *)info->item;
+		printf("5.1222 \n");
+
+		if (make_nod(dir, tokens[n_tokens - 1]) != 0)
+		{
+			printf("left make_dir\n");
+			free(creation_path);
+			free(not_const_path);
+			free(info);
+			free(tokens);
+			return -ENOMEM;
+		}
+		printf("7. \n");
 		free(creation_path);
+		free(tokens);
 		free(not_const_path);
-		return -ENOENT;
+		free(info);
+		printf("returning in mkdir");
 	}
-	else
+	else // make dir
 	{
 		struct dir_data *dir = (struct dir_data *)info->item;
 		printf("5. \n");
@@ -410,7 +436,6 @@ int lfs_mkdir(const char *path, mode_t mode)
 		if (dir->dir_count >= dir->dir_max_size && dir->dir_count < INT_MAX)
 		{
 			printf("IN IF on line 318\n");
-			// TODO: reallock has to work!
 			dir->dirs = realloc(dir->dirs, dir->dir_max_size * 10);
 			dir->dir_max_size = dir->dir_max_size * 10;
 		}
@@ -477,7 +502,7 @@ int make_dir(struct dir_data *dir, char *name)
 	}
 	new_dir->dir_count = 0;
 	new_dir->dir_max_size = 10;
-	new_dir->file_max_size = 10;
+	new_dir->file_init_size = 10;
 	new_dir->file_count = 0;
 	new_dir->mode = __S_IFDIR | 0755;
 
@@ -487,6 +512,51 @@ int make_dir(struct dir_data *dir, char *name)
 	return 0;
 }
 
+int make_nod(struct dir_data *dir, char *name)
+{
+	printf("Enter make_file\n");
+	struct inode *new_file = malloc(sizeof(struct inode));
+	if (!new_file)
+	{
+		printf("new_file couldn't be allocated\n");
+		return -ENOMEM;
+	}
+
+	printf("Enter make_file\n");
+
+	char *malloced_name = malloc(sizeof(char) * strlen(name) + 1);
+	if (!malloced_name)
+	{
+		printf("malloced name couldn't be allocated\n");
+		return -ENOMEM;
+	}
+
+	strcpy(malloced_name, name);
+
+	// set fields of new dir
+	new_file->name = malloced_name;
+	new_file->access_time = time(NULL);
+	new_file->modify_time = time(NULL);
+	new_file->mode = __S_IFDIR | 0755;
+
+	new_file->content = malloc(sizeof(char) * dir->file_init_size);
+	if (!new_file->content)
+	{
+		free(malloced_name);
+		printf("new_files -> fucked up\n");
+		return -ENOMEM;
+	}
+	new_file->size_allocated = dir->file_init_size;
+	new_file->content_size = dir->file_init_size;
+
+	// insert new file in parent dir
+	dir->files[dir->file_count] = *new_file;
+	dir->file_count++;
+
+	return 0;
+}
+
+
 // Permission
 int lfs_open(const char *path, struct fuse_file_info *fi)
 {	
@@ -494,7 +564,7 @@ int lfs_open(const char *path, struct fuse_file_info *fi)
 	if (info->found && !info->is_dir) {
 		struct inode* file = (struct inode*) info->item;
 		// might type cast file obj? to uint64_t
-		fi->fh = file;
+		fi->fh = (uint64_t) file;
 		return 0;
 	}
 
@@ -505,9 +575,12 @@ int lfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse
 {
 	printf("read: (path=%s)\n", path);
 
-	// struct inode* file = (struct inode*) fi->fh;
+	struct inode* file = (struct inode*) fi->fh;
+	if (!file) {
+		return -ENOENT;
+	}
 	
-
+	/**
 	struct dir_file_info *file_info = find_info(path);
 	if (!file_info)
 	{
@@ -516,14 +589,30 @@ int lfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse
 
 	if (!file_info->found || file_info->is_dir)
 		return -ENOENT;
-
+	
 	struct inode *file = (struct inode *)file_info->item;
-	size = size > file->size ? file->size : size;
+	*/
 
-	memcpy(buf, file->content, size);
+	size = (size + offset) > file->content_size ? file->content_size : size;
 
-	free(file_info);
-	return 6;
+	memcpy(buf, file->content + offset, size);
+
+	// free(file_info);
+	return size;
+}
+
+int lfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+	printf("write: (path=%s)\n", path);
+
+	struct inode* file = (struct inode*) fi->fh;
+	if (!file) {
+		return -ENOENT;
+	}
+
+	size = (size + offset) > file->content_size ? file->content_size : size;
+	memcpy(file->content + offset, buf, size);
+
+	return size;
 }
 
 int lfs_release(const char *path, struct fuse_file_info *fi)
@@ -541,7 +630,7 @@ int main(int argc, char *argv[])
 	root->files = malloc(sizeof(struct inode) * 10); // base size of 10
 	root->name = "/";
 	root->dir_max_size = 10;
-	root->file_max_size = 10;
+	root->file_init_size = 10;
 	root->mode = __S_IFDIR | 0755;
 
 	/**
