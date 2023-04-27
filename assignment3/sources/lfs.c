@@ -412,6 +412,16 @@ int make_content(const char *path, mode_t mode, int is_file)
 		struct dir_data *dir = (struct dir_data *)info->item;
 		printf("5.1222 \n");
 
+		// if (dir->file_count >= dir->file_init_size && dir->dir_count < INT_MAX)
+		// {
+		// 	printf("IN IF on line 318\n");
+		// 	dir->dirs = realloc(dir->dirs, dir->dir_max_size * 10);
+		// 	if (!dir->dirs) {
+		// 		return -ENOMEM;
+		// 	}
+		// 	dir->dir_max_size = dir->dir_max_size * 10;
+		// }
+
 		if (make_nod(dir, tokens[n_tokens - 1]) != 0)
 		{
 			printf("left make_dir\n");
@@ -437,6 +447,9 @@ int make_content(const char *path, mode_t mode, int is_file)
 		{
 			printf("IN IF on line 318\n");
 			dir->dirs = realloc(dir->dirs, dir->dir_max_size * 10);
+			if (!dir->dirs) {
+				return -ENOMEM;
+			}
 			dir->dir_max_size = dir->dir_max_size * 10;
 		}
 		printf("6. \n");
@@ -560,6 +573,7 @@ int make_nod(struct dir_data *dir, char *name)
 // Permission
 int lfs_open(const char *path, struct fuse_file_info *fi)
 {	
+	printf("Opening path: %s\n", path);
 	struct dir_file_info *info = find_info(path);
 	if (info->found && !info->is_dir) {
 		struct inode* file = (struct inode*) info->item;
@@ -567,7 +581,7 @@ int lfs_open(const char *path, struct fuse_file_info *fi)
 		fi->fh = (uint64_t) file;
 		return 0;
 	}
-
+	printf("Leaving open\n");
 	return -ENOENT;
 }
 
@@ -579,6 +593,7 @@ int lfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse
 	if (!file) {
 		return -ENOENT;
 	}
+	printf("Reading file, name: %s, content: %s\n", file->name, file->content);
 	
 	/**
 	struct dir_file_info *file_info = find_info(path);
@@ -608,8 +623,17 @@ int lfs_write(const char *path, const char *buf, size_t size, off_t offset, stru
 	if (!file) {
 		return -ENOENT;
 	}
-
-	size = (size + offset) > file->content_size ? file->content_size : size;
+	if (file->size_allocated <= size + offset) {
+		while (file->size_allocated <= size + offset) {
+			file->size_allocated = file->size_allocated*10;
+		}
+		file->content = realloc(file->content, file->size_allocated);
+		if (!file->content) return -ENOMEM;
+		file->content_size = size + offset;
+		file->content[file->content_size] = '\0';
+	}
+	
+	// file->content + offset to append new content
 	memcpy(file->content + offset, buf, size);
 
 	return size;
