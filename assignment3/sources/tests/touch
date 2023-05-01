@@ -22,3 +22,7 @@ rm file.txt
 ls -la 
 echo "-------- Success  --------"
 sleep 2
+echo "-------- Test#7: Testing create duplicate file names  --------"
+touch file.txt
+echo "-------- Success  --------"
+
