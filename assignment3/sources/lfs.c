@@ -13,21 +13,26 @@ int lfs_release(const char *path, struct fuse_file_info *fi);
 int lfs_mkdir(const char *path, mode_t mode);
 int lfs_mknod(const char *path, mode_t mode, dev_t dev);
 int lfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
+int lfs_truncate(const char *path, off_t length);
+int lfs_rmdir(const char *path);
+int lfs_unlink(const char *path);
+int lfs_utime(const char *, struct utimbuf *);
 
 static struct fuse_operations lfs_oper = {
 	.getattr = lfs_getattr,
 	.readdir = lfs_readdir,
 	.mknod = lfs_mknod,
 	.mkdir = lfs_mkdir,
-	.unlink = NULL,
-	.rmdir = NULL,
-	.truncate = NULL,
+	.unlink = lfs_unlink,
+	.rmdir = lfs_rmdir,
+	.truncate = lfs_truncate,
 	.open = lfs_open,
 	.read = lfs_read,
-	.release = NULL,
+	.release = lfs_release,
 	.write = lfs_write,
 	.rename = NULL,
-	.utime = NULL};
+	.utime = lfs_utime
+};
 
 struct inode
 { // used like the Inode of the specific file
@@ -51,6 +56,8 @@ struct dir_data
 	int file_count;
 	int current_file_max_size;
 	__mode_t mode;
+	__time_t access_time;
+	__time_t modify_time;
 };
 
 struct dir_file_info
@@ -102,7 +109,7 @@ int lfs_getattr(const char *path, struct stat *stbuf)
 		stbuf->st_nlink = 1;
 		stbuf->st_atime = file->access_time;
 		stbuf->st_mtime = file->modify_time;
-		stbuf->st_size = file->size_allocated;
+		stbuf->st_size = file->content_size;
 	}
 	else
 		res = -ENOENT;
@@ -288,6 +295,41 @@ int lfs_mknod(const char *path, mode_t mode, dev_t dev)
 	return make_content(path, mode, 1);
 }
 
+int lfs_rmdir(const char *path) {
+	struct dir_file_info *info = find_info(path);
+
+	if(!info) return -ENOENT;
+	if(!info->found || !info->is_dir) {
+		if(info->item) free(info->item); // may still be file
+		free(info);
+		return -ENOENT;
+	}
+	struct dir_data *dir = (struct dir_data *)info->item;
+	if(dir->file_count == 0 && dir->dir_count == 0) {
+		free(dir->files);
+		free(dir->dirs);
+		free(dir->name);
+	}
+	
+	return 0;
+}
+
+int lfs_unlink(const char *path) {
+	struct dir_file_info *info = find_info(path);
+
+	if(!info) return -ENOENT;
+	if(!info->found || info->is_dir) {
+		if(info->item) free(info->item); // may still be dir
+		free(info);
+		return -ENOENT;
+	}
+	struct inode *file = (struct inode *)info->item;
+	free(file->name);
+	free(file->content);
+	
+	return 0;
+}
+
 int lfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
 	// (void) offset;
@@ -327,6 +369,7 @@ int lfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 	free(info);
 	return 0;
 }
+
 
 int make_content(const char *path, mode_t mode, int is_file)
 {
@@ -438,6 +481,7 @@ int make_content(const char *path, mode_t mode, int is_file)
 		free(not_const_path);
 		free(info);
 		printf("returning in mkdir");
+
 	}
 	else // make dir
 	{
@@ -471,6 +515,7 @@ int make_content(const char *path, mode_t mode, int is_file)
 			return -ENOMEM;
 		}
 		printf("7. \n");
+
 		free(creation_path);
 		free(tokens);
 		free(not_const_path);
@@ -580,6 +625,7 @@ int lfs_open(const char *path, struct fuse_file_info *fi)
 		struct inode *file = (struct inode *)info->item;
 		// might type cast file obj? to uint64_t
 		fi->fh = (uint64_t)file;
+		file -> access_time = time(NULL);
 		return 0;
 	}
 	printf("Leaving open\n");
@@ -600,7 +646,9 @@ int lfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse
 	size = (size + offset) > file->content_size ? file->content_size : size;
 
 	memcpy(buf, file->content + offset, file->content_size - offset);
-	buf[4] = '\0'; 
+	
+	// set access time when a file is read
+	file -> access_time = time(NULL);
 
 	// free(file_info);
 	return size;
@@ -626,14 +674,39 @@ int lfs_write(const char *path, const char *buf, size_t size, off_t offset, stru
 	// file->content + offset to append new content
 	memcpy(file->content + offset, buf, size);
 
+	// write to file; set modified time 
+	file -> modify_time = time(NULL);
+
 	return size;
+}
+
+int lfs_truncate(const char *path, off_t length) {
+	struct dir_file_info *info = find_info(path);
+	printf("truncate length is: %li\n", length);
+	if (info->is_dir) {
+		return -ENOENT;
+	} else {
+		struct inode *file = (struct inode *) info->item;
+		file->content = realloc(file->content, length);
+		file->size_allocated = length;
+		if (length < file->content_size) {
+			file->content_size = length;
+		}
+		return 0;
+	}
 }
 
 int lfs_release(const char *path, struct fuse_file_info *fi)
 {
 	printf("release: (path=%s)\n", path);
+	fi->fh = 0;
 	return 0;
 }
+
+int lfs_utime (const char *path, struct utimbuf *ass) {
+	return 0;
+}
+
 
 int main(int argc, char *argv[])
 {
