@@ -1,6 +1,7 @@
-dir = ./tests
-for entry in "$dir"/*
+cd tests
+filenames=`ls`
+for entry in $filenames
 do
-    bash "tests/$entry"
+    bash "$entry"
     sleep 5
 done
