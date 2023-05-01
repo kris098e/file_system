@@ -501,19 +501,11 @@ static int make_content(const char *path, mode_t mode, int is_file)
 	{
 		struct dir_data *dir = (struct dir_data *)info->item;
 
-		// check if the file is name is already used for a dir
-		// if(check_is_dir(tokens[n_tokens-1], &dir, info)) {
-		// 	free_path_info(path_info);
-		// 	free(info);
-		// 	printf("IS DIR MAKKER!\n");
-		// 	return -EISDIR;
-		// }
-
 		printf("5.1222 \n");
 
 		if (dir->file_count >= dir->current_file_max_size && dir->current_file_max_size * 10 < INT_MAX)
 		{
-			dir->files = realloc(dir->files, dir->current_file_max_size * 10);
+			dir->files = realloc(dir->files, dir->current_file_max_size * 10 * sizeof(struct inode));
 			if (!dir->files)
 			{
 				free_path_info(path_info);
@@ -549,7 +541,7 @@ static int make_content(const char *path, mode_t mode, int is_file)
 		if (dir->dir_count >= dir->current_dir_max_size && dir->current_dir_max_size * 10 < INT_MAX)
 		{
 			printf("IN IF on line 318\n");
-			dir->dirs = realloc(dir->dirs, dir->current_dir_max_size * 10);
+			dir->dirs = realloc(dir->dirs, dir->current_dir_max_size * 10 * sizeof(struct dir_data));
 			if (!dir->dirs)
 			{
 				free_path_info(path_info);
