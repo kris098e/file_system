@@ -1,11 +1,24 @@
 #!/bin/bash
 cd /tmp/fuse
+echo "-------- Test#4: Testing make file --------"
 mkdir a
-touch a
-tree
+touch file.txt
+tree /tmp/fuse
+echo "-------- Success  --------"
 
 sleep 2
-
-rm -r /tmp/fuse/*
-touch a b c d e
+echo "-------- Test#4: Testing write little data file --------"
+echo "I am a test string look at me go" > file.txt
+cat file.txt 
+echo "-------- Success  --------"
+sleep 2
+echo "-------- Test#5: Testing write huge data file --------"
+for i in {1..10000}; do echo $i > file.txt; done;
 ls -la
+sleep 2
+echo "-------- Success  --------"
+echo "-------- Test#6: Testing delete huge data file --------"
+rm file.txt 
+ls -la 
+echo "-------- Success  --------"
+sleep 2
