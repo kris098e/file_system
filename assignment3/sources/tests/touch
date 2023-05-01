@@ -1,0 +1,11 @@
+#!/bin/bash
+cd /tmp/fuse
+mkdir a
+touch a
+tree
+
+sleep 2
+
+rm -r /tmp/fuse/*
+touch a b c d e
+ls -la
