@@ -1,7 +1,7 @@
 #!/bin/bash
 cd /tmp/fuse
 
-echo "Creating directories"
+echo "--------Test#1: Creating directories --------"
 mkdir dirs
 cd dirs
 mkdir a b c d e
@@ -18,7 +18,7 @@ tree /tmp/fuse/
 echo "-------- Sucess --------"
 
 sleep 5
-echo "-------- Removing all directories + sub-directories --------"
+echo "--------Test#2: Removing all directories + sub-directories --------"
 
 cd /tmp/fuse
 rm -r dirs
