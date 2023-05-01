@@ -1,0 +1,32 @@
+#!/bin/bash
+cd /tmp/fuse
+
+echo "--------Test#1: Creating directories --------"
+mkdir dirs
+cd dirs
+mkdir a b c d e
+cd a
+mkdir a b c d e
+cd b
+mkdir a b c d e
+cd e
+mkdir help me i am trapped 
+cd trapped 
+mkdir still trapped
+cd trapped 
+tree /tmp/fuse/
+echo "-------- Sucess --------"
+
+echo " " 
+sleep 5
+echo "--------Test#2: Removing all directories + sub-directories --------"
+
+cd /tmp/fuse
+rm -r dirs
+
+tree /tmp/fuse/
+echo "-------- Sucess --------"
+sleep 2
+
+echo " " 
+

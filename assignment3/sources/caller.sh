@@ -3,5 +3,5 @@ filenames=`ls`
 for entry in $filenames
 do
     bash "$entry"
-    sleep 5
+    sleep 1
 done

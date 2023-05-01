@@ -1,0 +1,35 @@
+#!/bin/bash
+cd /tmp/fuse
+mkdir a
+cd a
+
+echo "-------- Test#4: Testing make file --------"
+touch file.txt
+tree /tmp/fuse
+echo "-------- Success  --------"
+echo " " 
+sleep 2
+
+echo "-------- Test#5: Testing write data file --------"
+for i in {1..100}; do echo $i > file.txt; done;
+cat file.txt
+ls -la
+echo "-------- Success  --------"
+echo  " " 
+sleep 2
+
+echo "-------- Test#6: Testing delete file with data --------"
+rm file.txt 
+ls -la 
+echo "-------- Success  --------"
+echo " " 
+sleep 2
+
+echo "-------- Test#7: Testing create duplicate file names  --------"
+touch file.txt
+ls -la
+cat file.txt
+echo "-------- Success  --------"
+echo " " 
+cd /tmp/fuse/
+rm -r a

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+cd /tmp/fuse
+mkdir test
+cd test
+
+echo "-------- Test12: modified / access time on dir --------"
+touch hejallesammenvelkommentilvoresfilsystem
+echo hej alle sammen jeg er fanget!! > hejallesammenvelkommentilvoresfilsystem
+nano hejallesammenvelkommentilvoresfilsystem
+
+echo "-------- Sucess --------"
+
+cd /tmp/fuse/
+rm -r test

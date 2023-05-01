@@ -1,0 +1,22 @@
+#!/bin/bash
+cd /tmp/fuse
+mkdir test 
+cd test
+
+
+echo "-------- Test8: Creating dir, which name is already a file --------"
+touch a
+mkdir a
+echo "-------- expected error message, not created Sucess --------"
+echo  " " 
+sleep 2
+
+echo "-------- Test9: Creating file, which name is already a dir --------"
+mkdir b
+touch b
+ls -la 
+echo "-------- expected dir to be there; Sucess --------"
+echo " "
+rm -r /tmp/fuse/test
+sleep 2
+

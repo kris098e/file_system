@@ -1,0 +1,36 @@
+#!bin/bash
+
+cd /tmp/fuse
+mkdir tests
+cd tests
+
+echo "-------- Test10: modified / access time on files --------"
+touch testfile1
+stat testfile1
+
+sleep 3
+
+echo "123" > testfile1
+stat testfile1
+echo "-------- Sucess --------"
+echo " "
+sleep 2
+
+echo "-------- Test11: modified / access time on dir --------"
+mkdir folder
+stat folder
+
+sleep 3
+
+cd folder
+touch testfile
+echo "lol" > testfile
+cd ..
+stat folder
+
+sleep 3
+
+echo "-------- Sucess --------"
+echo " " 
+cd /tmp/fuse
+rm -r tests
