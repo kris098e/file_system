@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <unistd.h>
+#include <sys/shm.h>
 
 int lfs_getattr(const char *, struct stat *);
 int lfs_readdir(const char *, void *, fuse_fill_dir_t, off_t, struct fuse_file_info *);
@@ -82,13 +84,16 @@ static int make_nod(struct dir_data *dir, char *name);
 static int make_content(const char *path, mode_t mode, int is_file);
 static struct path_info *get_path_info(const char *path);
 static void free_path_info(struct path_info *path_info);
+static int init_root();
 
 struct dir_data *root;
 
+int *shared_variable;
+
 int lfs_getattr(const char *path, struct stat *stbuf)
 {
+	*shared_variable = 1;
 	int res = 0;
-	printf("getattr: (path=%s)\n", path);
 
 	memset(stbuf, 0, sizeof(struct stat));
 
@@ -100,7 +105,6 @@ int lfs_getattr(const char *path, struct stat *stbuf)
 	if (info->found && info->is_dir)
 	{
 		struct dir_data *dir = (struct dir_data *)info->item;
-		printf("in read dir\n");
 		stbuf->st_mode = dir->mode;
 		stbuf->st_nlink = 2 + dir->dir_count;
 		stbuf->st_atime = dir->access_time;
@@ -109,7 +113,6 @@ int lfs_getattr(const char *path, struct stat *stbuf)
 	// file
 	else if (info->found && !info->is_dir)
 	{
-		printf("in read file\n");
 		struct inode *file = (struct inode *)info->item;
 
 		stbuf->st_mode = __S_IFREG | 0777;
@@ -120,11 +123,8 @@ int lfs_getattr(const char *path, struct stat *stbuf)
 	}
 	else
 		res = -ENOENT;
-
-	printf("before free info\n");
+		
 	free(info);
-	printf("can return\n");
-	printf("res: %d\n", res);
 	return res;
 }
 
@@ -132,13 +132,11 @@ int lfs_getattr(const char *path, struct stat *stbuf)
 // returns the info object associated with the path
 static struct dir_file_info *find_info(const char *path)
 {
-	printf("path in find_info start: %s\n", path);
 	struct dir_data *dir = root;
 	struct dir_file_info *info = malloc(sizeof(struct dir_file_info)); // return value
 	if (!info)
 		return NULL;
 
-	printf("1\n");
 	// check if root dir
 	if (strcmp(path, "/") == 0)
 	{
@@ -148,13 +146,10 @@ static struct dir_file_info *find_info(const char *path)
 		info->item = root;
 		return info;
 	}
-	printf("path in find_info 4: %s\n", path);
 
-	printf("4\n");
 	info->found = 0;
 	info->item = NULL;
 
-	printf("5\n");
 	struct path_info *path_info = get_path_info(path);
 	if (!path_info) {
 		free(info);
@@ -167,32 +162,20 @@ static struct dir_file_info *find_info(const char *path)
 
 	int succeded, i;
 
-	printf("Path for tokens: %s\n", path);
-	for (int k = 0; k < n_tokens; k++)
-	{
-		printf("token[%i] = %s\n", k, tokens[k]);
-	}
-
-	printf("6.1\n");
 	for (i = 0; i < n_tokens; i++)
 	{
-		printf("6.2\n");
 		token = tokens[i];
 		succeded = check_is_dir(token, &dir, info);
-		printf("6.3\n");
 		if (!succeded && (i == n_tokens - 1))
 		{
-			printf("6.4\n");
 			check_is_file(token, dir, info, (i == n_tokens - 1));
 		}
 		if (succeded && (i == n_tokens - 1))
 		{
 				info->found = 1;
 		}
-		printf("6.5\n");
 	}
 	free_path_info(path_info);
-	printf("7\n");
 	return info;
 }
 
@@ -220,31 +203,20 @@ static void check_is_file(char *token, struct dir_data *dir, struct dir_file_inf
  */
 static int check_is_dir(char *token, struct dir_data **dir, struct dir_file_info *info)
 {
-	printf("20. before checking %s\n", (*dir)->name);
 	int i = 0;
-	printf("6.1.1\n");
-
-	printf("name: %s\n", (*dir)->name);
-	printf("token: %s\n", token);
-	printf("dir count: %d\n", (*dir)->dir_count);
 
 	while (i < (*dir)->dir_count && (strcmp((*dir)->dirs[i].name, token) != 0))
 	{
-		printf("LOOK AT ME MUM; name: %s\n", (*dir)->dirs[i].name);
 		++i;
 	}
-	printf("6.1.2\n");
 
 	if (i != (*dir)->dir_count)
 	{
 		*dir = &(*dir)->dirs[i];
-		printf("found directory\n");
-		printf("dir name: %s\n", (*dir)->name);
 		info->is_dir = 1;
 		info->item = (*dir);
 		return 1;
 	}
-	printf("6.1.3\n");
 
 	return 0;
 }
@@ -279,12 +251,10 @@ int lfs_mknod(const char *path, mode_t mode, dev_t dev)
 
 int lfs_rmdir(const char *path)
 {
-	printf("IN RMDIR BITCH\n");
 	struct path_info *path_info = get_path_info(path);
 	if (!path_info)
 		return -ENOMEM; // path_info is the errno msg at this point
 	char *creation_path = path_info->creation_path;
-	printf("rmdir 1\n");
 
 	// find possible parent dir
 	struct dir_file_info *info = find_info(creation_path);
@@ -293,8 +263,6 @@ int lfs_rmdir(const char *path)
 		free_path_info(path_info);
 		return -ENOMEM;
 	}
-	printf("rmdir 2\n");
-
 
 	// if not found or not directory
 	if (!info->found || !info->is_dir)
@@ -303,8 +271,6 @@ int lfs_rmdir(const char *path)
 		free_path_info(path_info);
 		return -ENOENT;
 	}
-	printf("rmdir 3\n");
-
 	// parent directory of the dir we want to delete 
 	struct dir_data *parent_dir = (struct dir_data *)info->item;
 	// check if dir is empty
@@ -313,67 +279,51 @@ int lfs_rmdir(const char *path)
 		free(info);
 		return -ENOENT;
 	}
-	printf("rmdir 4\n");
-
 
 	int dir_index = 0;
 	while (dir_index < parent_dir->dir_count &&
 		   strcmp((parent_dir->dirs[dir_index]).name, path_info->tokens[path_info->n_tokens-1]))
 	{	
-		printf("check %s == %s, dir_index = %d, with cmp = %d\n", parent_dir->dirs[dir_index].name, path_info->tokens[path_info->n_tokens-1], dir_index, strcmp((parent_dir->dirs[dir_index]).name, path_info->tokens[path_info->n_tokens-1]));
 		++dir_index;
 	}
 	// dir we want to remove
 	struct dir_data *dir = &parent_dir->dirs[dir_index];
-	printf("rmdir 5\n");
-
 
 	// (dir not found in parent directory || dir contains files or dirs) -> dont free
 	if (dir_index == parent_dir->dir_count || dir->dir_count != 0 || dir->file_count != 0) {
-		printf("rmdir 5.1\n");
 
 		free_path_info(path_info);
 		free(info);
 		return -ENOENT;
 	} else { // found, contains no files and no dirs
-		printf("rmdir 5.2\n");
 
 		free(dir->dirs);
-		printf("rmdir 5.3\n");
 
 		free(dir->files);
-		printf("rmdir 5.4\n");
 		free(dir->name);
-		printf("rmdir 5.5\n");
-		printf("rmdir 5.6\n");
+		
 
 		parent_dir->dirs[dir_index] = parent_dir->dirs[parent_dir->dir_count-1]; // swap the last dir into the removed dirs space
 		--parent_dir->dir_count;
-		printf("rmdir 5.7\n");
 
+		parent_dir->modify_time = time(NULL);
 		free_path_info(path_info);
-		printf("rmdir 5.8\n");
 
 		free(info);
-
-		printf("OUT OF RMDIR BOIIIIES\n");
 		return 0;
 	}
 }
 
 int lfs_unlink(const char *path)
 {	
-	printf("IN UNLINK\n");
 	struct path_info *path_info = get_path_info(path);
 	if (!path_info)
 		return -ENOMEM; // path_info is the errno msg at this point
 	char *creation_path = path_info->creation_path;
-	printf("unlink 0\n");
 
 	struct dir_file_info *info = find_info(creation_path);
 	if (!info) return -ENOMEM;
 	
-	printf("unlink 1\n");
 
 	if (!info->found || !info->is_dir)
 	{
@@ -383,24 +333,18 @@ int lfs_unlink(const char *path)
 	}
 	// parent dir of file to be removed
 	struct dir_data *parent_dir = (struct dir_data *)info->item;
-	printf("unlink 2\n");
 
 	if (parent_dir->file_count == 0) {
 		free_path_info(path_info);
 		free(info);
-		printf("unlink filecount == 0\n");
 		return -ENOENT;
 	}
-	printf("unlink 3\n");
 	int file_index = 0;
 	while (file_index < parent_dir->file_count &&
 		   strcmp((parent_dir->files[file_index]).name, path_info->tokens[path_info->n_tokens-1]))
 	{
-		printf("check %s == %s, dir_index = %d, with cmp = %d\n", parent_dir->files[file_index].name, path_info->tokens[path_info->n_tokens-1], file_index, strcmp((parent_dir->files[file_index]).name, path_info->tokens[path_info->n_tokens-1]));
-
 		++file_index;
 	}
-	printf("unlink 4\n");
 
 	// file we want to remove
 	struct inode *file = &parent_dir->files[file_index];
@@ -416,19 +360,15 @@ int lfs_unlink(const char *path)
 		parent_dir->files[file_index] = parent_dir->files[parent_dir->file_count-1]; // swap the last fille into the removed files space
 		--parent_dir->file_count;
 		
+		parent_dir->modify_time = time(NULL); // when removed file, update modify time
 		free_path_info(path_info);
 		free(info);
-		printf("OUT OF UNLINK\n");
 		return 0;
 	}
 }
 
 int lfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
-	// (void) offset;
-	// (void) fi;
-	printf("readdir: (path=%s)\n", path);
-
 	struct dir_file_info *info = find_info(path);
 	if (!info)
 		return -ENOMEM;
@@ -449,11 +389,9 @@ int lfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 	else
 	{
 		struct dir_data *dir = (struct dir_data *)info->item;
-		printf("1. dir has name %s\n", dir->name);
-		printf("2. dir has count %d\n", dir->dir_count);
+		dir->access_time = time(NULL);
 		for (int i = 0; i < dir->dir_count; i++)
 		{
-			printf("found a dir with name %s\n", dir->dirs[i].name);
 			filler(buf, dir->dirs[i].name, NULL, 0);
 		}
 		for (int j = 0; j < dir->file_count; j++)
@@ -461,24 +399,18 @@ int lfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 			filler(buf, dir->files[j].name, NULL, 0);
 		}
 	}
-	printf("Returning from readdir\n");
 	free(info);
 	return 0;
 }
 
 static int make_content(const char *path, mode_t mode, int is_file)
 {
-	printf("IN MAKE CONTENT:\n");
-	printf("PATH IN MAKE CONTENT: %s\n", path);
-
 	struct path_info *path_info = get_path_info(path);
 	if (!path_info)
 		return -ENOMEM;
 	char *creation_path = path_info->creation_path;
 	char **tokens = path_info->tokens;
 	int n_tokens = path_info->n_tokens;
-
-	printf("creationpath: %s\n", creation_path);
 
 	struct dir_file_info *info = find_info(creation_path);
 	if (!info)
@@ -488,20 +420,12 @@ static int make_content(const char *path, mode_t mode, int is_file)
 	{
 		free_path_info(path_info);
 		free(info);
-		printf("info couldn't be found\n");
 		return -ENOENT;
 	}
-
-	printf("4. \n");
-	printf("did find %d\n", info->found);
-	printf("MKDIR INFO FOUND %s\n", ((struct dir_data *)(info->item))->name);
-	printf("tokens %s\n", tokens[0]);
 
 	if (is_file) // make file
 	{
 		struct dir_data *dir = (struct dir_data *)info->item;
-
-		printf("5.1222 \n");
 
 		if (dir->file_count >= dir->current_file_max_size && dir->current_file_max_size * 10 < INT_MAX)
 		{
@@ -523,24 +447,20 @@ static int make_content(const char *path, mode_t mode, int is_file)
 
 		if (make_nod(dir, tokens[n_tokens - 1]) != 0)
 		{
-			printf("left make_dir\n");
 			free_path_info(path_info);
 			free(info);
 			return -ENOMEM;
 		}
-		printf("7. \n");
+		dir->modify_time = time(NULL);
 		free_path_info(path_info);
 		free(info);
-		printf("returning in mkdir");
 	}
 	else // make dir
 	{
 		struct dir_data *dir = (struct dir_data *)info->item;
-		printf("5. \n");
 
 		if (dir->dir_count >= dir->current_dir_max_size && dir->current_dir_max_size * 10 < INT_MAX)
 		{
-			printf("IN IF on line 318\n");
 			dir->dirs = realloc(dir->dirs, dir->current_dir_max_size * 10 * sizeof(struct dir_data));
 			if (!dir->dirs)
 			{
@@ -557,27 +477,21 @@ static int make_content(const char *path, mode_t mode, int is_file)
 
 			return -ENOMEM;
 		}
-		printf("6. \n");
-
 		if (make_dir(dir, tokens[n_tokens - 1]) != 0)
 		{
 			free_path_info(path_info);
 			free(info);
 			return -ENOMEM;
 		}
-		printf("7. \n");
-
+		dir->modify_time = time(NULL);
 		free_path_info(path_info);
 		free(info);
-		printf("returning in mkdir");
 	}
-	printf("LEFT MAKE CONTENT:\n");
 	return 0;
 }
 
 static int make_dir(struct dir_data *dir, char *name)
 {
-	printf("Enter make_dir\n");
 	struct dir_data *new_dir = &dir->dirs[dir->dir_count];
 
 	char *malloced_name = malloc(sizeof(char) * strlen(name) + 1);
@@ -592,7 +506,6 @@ static int make_dir(struct dir_data *dir, char *name)
 	{
 		free(new_dir);
 		free(malloced_name);
-		printf("new_dir->dirs couldn't be allocated\n");
 		return -ENOMEM;
 	}
 	new_dir->files = malloc(sizeof(struct inode) * 10);
@@ -601,7 +514,6 @@ static int make_dir(struct dir_data *dir, char *name)
 		free(malloced_name);
 		free(new_dir->dirs);
 		free(new_dir);
-		printf("new_dir->files couldn't be allocated\n");
 		return -ENOMEM;
 	}
 	new_dir->dir_count = 0;
@@ -621,11 +533,7 @@ static int make_dir(struct dir_data *dir, char *name)
 
 static int make_nod(struct dir_data *dir, char *name)
 {
-	printf("Enter make_file\n");
 	struct inode *new_file = &dir->files[dir->file_count];
-	
-	printf("Enter make_file\n");
-
 	char *malloced_name = malloc(sizeof(char) * strlen(name) + 1);
 	if (!malloced_name) return -ENOMEM;
 	
@@ -651,7 +559,6 @@ static int make_nod(struct dir_data *dir, char *name)
 // Permission
 int lfs_open(const char *path, struct fuse_file_info *fi)
 {
-	printf("Opening path: %s\n", path);
 	struct dir_file_info *info = find_info(path);
 	if (!info)
 		return -ENOMEM;
@@ -664,20 +571,15 @@ int lfs_open(const char *path, struct fuse_file_info *fi)
 		file->access_time = time(NULL);
 		return 0;
 	}
-	printf("Leaving open\n");
 	free(info);
 	return -ENOENT;
 }
 
 int lfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-	printf("read: (path=%s)\n", path);
-
 	struct inode *file = (struct inode *)fi->fh;
 	if (!file)
 		return -ENOENT;
-
-	printf("Reading file, name: %s, content: %s\n", file->name, file->content);
 
 	size = (size + offset) > file->content_size ? file->content_size : size;
 
@@ -692,8 +594,6 @@ int lfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse
 
 int lfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-	printf("write: (path=%s)\n", path);
-
 	struct inode *file = (struct inode *)fi->fh;
 	if (!file)
 		return -ENOENT;
@@ -702,7 +602,6 @@ int lfs_write(const char *path, const char *buf, size_t size, off_t offset, stru
 	if (!file->content)
 		return -ENOMEM;
 	file->content_size = size;
-	printf("realloc file size bro!!\n");
 
 	// file->content + offset to append new content
 	memcpy(file->content + offset, buf, size);
@@ -724,7 +623,6 @@ int lfs_truncate(const char *path, off_t length)
 		return -ENOENT;
 	}
 
-	printf("truncate length is: %li\n", length);
 	if (info->is_dir)
 	{
 		free(info);
@@ -744,7 +642,6 @@ int lfs_truncate(const char *path, off_t length)
 
 int lfs_release(const char *path, struct fuse_file_info *fi)
 {
-	printf("release: (path=%s)\n", path);
 	fi->fh = 0;
 	return 0;
 }
@@ -790,7 +687,6 @@ static struct path_info *get_path_info(const char *path)
 
 	strcpy(not_const_path, path);
 	not_const_path[strlen(path)] = '\0';
-	printf("get_path_info not_const_path: %s\n", not_const_path);
 	for (int i = 0; i < strlen(path); ++i)
 		if (path[i] == '/')
 			n_tokens++;
@@ -800,12 +696,7 @@ static struct path_info *get_path_info(const char *path)
 	{
 		free(path_info);
 		free(not_const_path);
-		printf("token couldn't be allocated\n");
 		return NULL;
-	}
-	printf("get_path_info n_tokens: %d\n", n_tokens);
-	for (int k = 0; k < n_tokens; k++) {
-		printf("get_path_info tokens[%d]: %s\n", k, tokens[k]);
 	}
 
 	// behave differently when making directories in root
@@ -830,8 +721,6 @@ static struct path_info *get_path_info(const char *path)
 	// add null-terminating byte to creation_path
 	creation_path[strlen(path) - strlen(tokens[n_tokens - 1]) + remove_extra_slash] = '\0';
 
-	printf("Length of creation_path(%s) = %ld\n", creation_path ,strlen(creation_path));
-
 	path_info->tokens = tokens;
 	path_info->creation_path = creation_path;
 	path_info->n_tokens = n_tokens;
@@ -843,17 +732,12 @@ static struct path_info *get_path_info(const char *path)
 static void free_path_info(struct path_info *path_info)
 {
 	free(path_info->tokens);
-	printf("Free 1 done\n");
 	free(path_info->not_const_path);
-	printf("Free 2 done\n");
 	free(path_info->creation_path);
-	printf("Free 3 done\n");
 	free(path_info);
-	printf("Free 4 done\n");
 }
 
-int main(int argc, char *argv[])
-{
+static int init_root() {
 	root = malloc(sizeof(struct dir_data));
 	if(!root) return -ENOMEM;
 	root->dir_count = 0;
@@ -869,8 +753,55 @@ int main(int argc, char *argv[])
 	root->current_file_max_size = 10;
 	root->access_time = time(NULL);
 	root->modify_time = time(NULL);
-
-	fuse_main(argc, argv, &lfs_oper);
-
 	return 0;
+}
+
+
+int main(int argc, char *argv[])
+{	
+	//int cp_error_code;
+	int id, shmid;
+	int err = 0;
+	if (!root) err = init_root(); 
+
+	// Create a shared memory segment
+    shmid = shmget(IPC_PRIVATE, sizeof(int), 0600);
+    if (shmid < 0) {
+        err = 1;
+    }
+
+    // Attach to the shared memory segment
+    shared_variable = (int *) shmat(shmid, NULL, 0);
+    if (shared_variable == (int *) -1) {
+        err = 1;
+    }
+
+	// init shared variable
+	*shared_variable = 0;
+
+
+	id = fork();
+	if (id == 0 && !err) {
+		while(!shared_variable);
+		system("mkdir ~/fusebackup 2> /dev/null");
+		system("cp -r ~/fusebackup/* /tmp/fuse/ 2> /dev/null");
+		
+
+		while(shared_variable) {
+			system("rsync -a --delete /tmp/fuse/ ~/fusebackup/ 2> /dev/null");
+			sleep(10);
+		}
+	} else {
+		fuse_main(argc, argv, &lfs_oper);
+		*shared_variable = 0;
+	}
+
+	// Detach from the shared memory segment
+    shmdt(shared_variable);
+
+    // Destroy the shared memory segment
+    shmctl(shmid, IPC_RMID, NULL);
+
+
+	return err;
 }

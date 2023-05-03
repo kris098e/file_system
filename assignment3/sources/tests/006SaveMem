@@ -1,0 +1,55 @@
+#! bin/bash
+
+cd /tmp/fuse
+
+
+echo "-------- Test12: Backup --------"
+
+for i in {1..5}; do echo $i > $i.hejtobiasellermads; done;
+echo the best group LOL > 4.hejtobiasellermads
+
+mkdir subfolder
+cd subfolder
+for i in {1..6}; do echo $i > $i.hejtobiasellermads; done;
+mkdir subsubfolder 
+cd subsubfolder
+for i in {1..7}; do echo $i > $i.awesomeFile; done;
+cd /tmp/fuse/
+echo " " 
+echo "-------- file content of 4.hejtobiasellermads --------"
+cat 4.hejtobiasellermads
+echo " " 
+sleep 2
+tree
+sleep 8
+echo "Closing fuse... "
+sleep 1
+
+echo "What backup looks like"
+tree ~/fusebackup/
+echo " " 
+sleep 3
+echo "content of 4.hejtobiasellermads"
+cat 4.hejtobiasellermads
+echo " "
+echo "Reopening fuse to clear it from main memory... "
+
+cd /tmp
+fusermount -u fuse
+rm -r fuse/
+mkdir fuse
+chmod 755 fuse/
+# Change path
+cd /home/sofus/programming/sdu/operatingsystems/asg3/file_system/assignment3/sources
+./lfs /tmp/fuse/ &
+sleep 1
+cd /tmp/fuse
+echo " " 
+sleep 2
+
+echo "content of 4.hejtobiasellermads in filesystem"
+cat /tmp/fuse/4.hejtobiasellermads
+sleep 2
+tree /tmp/fuse/
+sleep 2 
+echo "-------- Sucess --------"

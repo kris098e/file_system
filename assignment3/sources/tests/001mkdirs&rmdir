@@ -1,4 +1,14 @@
 #!/bin/bash
+
+cd /tmp
+fusermount -u fuse
+rm -r fuse/
+mkdir fuse
+chmod 755 fuse/
+# Change path
+cd /home/sofus/programming/sdu/operatingsystems/asg3/file_system/assignment3/sources
+./lfs /tmp/fuse/ &
+
 cd /tmp/fuse
 
 echo "--------Test#1: Creating directories --------"
