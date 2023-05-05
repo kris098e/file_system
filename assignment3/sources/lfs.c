@@ -49,8 +49,8 @@ struct inode
 struct dir_data
 {
 	char *name;
-	struct dir_data *dirs; // could use dynamic, see https://stackoverflow.com/questions/3536153/c-dynamically-growing-array. Each dir has the option of having its own dir.
-	struct inode *files;   // could use dynamic
+	struct dir_data *dirs; 
+	struct inode *files;   
 	int dir_count;
 	int current_dir_max_size;
 	int file_init_size;
@@ -105,6 +105,7 @@ int lfs_getattr(const char *path, struct stat *stbuf)
 	if (info->found && info->is_dir)
 	{
 		struct dir_data *dir = (struct dir_data *)info->item;
+
 		stbuf->st_mode = dir->mode;
 		stbuf->st_nlink = 2 + dir->dir_count;
 		stbuf->st_atime = dir->access_time;
@@ -378,9 +379,6 @@ int lfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 		return -ENOENT;
 	}
 
-	filler(buf, ".", NULL, 0);
-	filler(buf, "..", NULL, 0);
-
 	if (!info->is_dir)
 	{
 		free(info);
@@ -399,6 +397,9 @@ int lfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 			filler(buf, dir->files[j].name, NULL, 0);
 		}
 	}
+	filler(buf, ".", NULL, 0);
+	filler(buf, "..", NULL, 0);
+
 	free(info);
 	return 0;
 }
@@ -566,7 +567,7 @@ int lfs_open(const char *path, struct fuse_file_info *fi)
 	if (info->found && !info->is_dir)
 	{
 		struct inode *file = (struct inode *)info->item;
-		// might type cast file obj? to uint64_t
+
 		fi->fh = (uint64_t)file;
 		file->access_time = time(NULL);
 		return 0;
@@ -715,7 +716,7 @@ static struct path_info *get_path_info(const char *path)
 		return NULL;
 	}
 
-	// copy parent dir of current dir over in creation_path
+	// copy parent dir of current dir to creation_path
 	memcpy(creation_path, path, (strlen(path) - strlen(tokens[n_tokens - 1]) + remove_extra_slash));
 	
 	// add null-terminating byte to creation_path

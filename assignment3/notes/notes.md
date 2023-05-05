@@ -1,44 +1,10 @@
-It is just a matter of implementing the `get_attr` and keeping a storage of the directories, with files. By using the methods, we are then able to write, list, read, $mkdir$ and so on. The path which are given to the functions are the absolute path. Maybe make a list of  `struct dir_data`  for each dir, which has the contents of each dir, which can then be traversed.  something like
-
-```c
-struct free_list {
-	int *inodes; // When done with a file_data, put the allocated inode into the list at last_index + 1. The list does not have to be sorted. 
-	int *last_index;
-	int size; // can be used when resizing, adding elements from the size to whatever required. 
-};
-
-struct file_data { // used like the Inode of the specific file
-	int id; // Inode id?
-	__time_t access_time;
-	__time_t modify_time;
-	char content[];
-};
-
-struct dir_data {
-	struct dir_data *dirs; // could use dynamic, see https://stackoverflow.com/questions/3536153/c-dynamically-growing-array. Each dir has the option of having its own dir.
-
-	char *name;
-	char *absolutepath; // can be used for quick reference, if smart solution
-	int dir_count;
-	int file_count;
-	
-	struct file_data *files; // could use dynamic
-};
-```
-
-# additional notes
-have an Inode counter/tracker outside of the structure, to keep track of which inodes can be used for the files. SHould be outside of the `dir_data` struct, as all dirs needs this.
-
-## Free file inodes
-use **Binary search** 
-
-## Directory
-### data structure
-#### sorted list
-#### red/black tree LOL
-#### Hash table (collision with linked list, or linear probing)
-
-
-## Should we assign blocks of memory to each file?
-### PCB block for files?
-
+* OO-implementation, simplyfying the code logic by handling directory one layer at a time via pointer manipulation
+* Passing pointers instead of the object itself (C is always passed by value)
+* As in regular file-system implementation, the "directory"-part of the volume holds pointers to the free FCB's, which is mimiced in our struct dir_data, where inodes are controlled by the directories, and the base directory holds pointers to all the possible files and directories in the FUSE instance
+* helper methods (allowing for more readable code, helper structs, less code duplication)
+* base struct attributes: mode, time, size manipulation attributes
+* dynamic and static memory allocation
+* errno (existing error messages allowing for more general and readable code for C-programmers)
+* Make sure to explicitly tell that we distinguish a directory from a file in our implementation, but we see the `backup`-directory as a file, as it is mentioned in the book, that files and directories may not be distuingishable in some file-system implementations
+* memory-sharing, forking (allowing the parent process which is actually running the FUSE-instance to be more responsive, as it has to handle no syncing), sleeping (making sure our process for backing up is not hugging the CPU, only awokned every 10 seconds), using existing syncing tool via the `system()`-method calling the `CLI` which only touches the modified files, and syncs such that the state of FUSE and the backup is as alike as possible
+* moving FUSE to disc by creating a backup, while restoring from the backup everytime our implementation is opened
