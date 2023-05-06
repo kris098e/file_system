@@ -40,7 +40,7 @@ rm -r fuse/
 mkdir fuse
 chmod 755 fuse/
 # Change path
-cd /home/sofus/programming/sdu/operatingsystems/asg3/file_system/assignment3/sources
+cd /home/kristian/documents/4.-semester/file_system/assignment3/sources
 ./lfs /tmp/fuse/ &
 sleep 1
 cd /tmp/fuse

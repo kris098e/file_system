@@ -302,7 +302,6 @@ int lfs_rmdir(const char *path)
 
 		free(dir->files);
 		free(dir->name);
-		
 
 		parent_dir->dirs[dir_index] = parent_dir->dirs[parent_dir->dir_count-1]; // swap the last dir into the removed dirs space
 		--parent_dir->dir_count;
