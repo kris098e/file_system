@@ -578,9 +578,9 @@ int lfs_open(const char *path, struct fuse_file_info *fi)
 
 int lfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-	struct inode *file = (struct inode *)fi->fh;
-	if (!file)
+	if (!fi->fh)
 		return -ENOENT;
+	struct inode *file = (struct inode *)fi->fh;
 
 	size = (size + offset) > file->content_size ? file->content_size : size;
 
