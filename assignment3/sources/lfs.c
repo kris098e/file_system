@@ -582,9 +582,9 @@ int lfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse
 		return -ENOENT;
 	struct inode *file = (struct inode *)fi->fh;
 
-	size = (size + offset) > file->content_size ? file->content_size : size;
+	size = (size + offset) > file->content_size ? (file->content_size - offset) : size;
 
-	memcpy(buf, file->content + offset, file->content_size - offset);
+	memcpy(buf, file->content + offset, size);
 
 	// set access time when a file is read
 	file->access_time = time(NULL);
