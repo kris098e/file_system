@@ -599,10 +599,10 @@ int lfs_write(const char *path, const char *buf, size_t size, off_t offset, stru
 	if (!file)
 		return -ENOENT;
 
-	file->content = realloc(file->content, size);
+	file->content = realloc(file->content, size + file->content_size);
 	if (!file->content)
 		return -ENOMEM;
-	file->content_size = size;
+	file->content_size = size + file->content_size;
 
 	// file->content + offset to append new content
 	memcpy(file->content + offset, buf, size);
