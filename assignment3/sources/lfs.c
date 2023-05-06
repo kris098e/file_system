@@ -278,7 +278,7 @@ int lfs_rmdir(const char *path)
 	if (parent_dir->dir_count == 0) {
 		free_path_info(path_info);
 		free(info);
-		return -ENOENT;
+		return -ENOTEMPTY;
 	}
 
 	int dir_index = 0;
