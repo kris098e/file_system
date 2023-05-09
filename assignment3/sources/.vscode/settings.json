@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        "*.c": "c",
         "bitset": "c",
         "chrono": "c",
         "typeinfo": "c",
@@ -8,6 +9,8 @@
         "functional": "c",
         "random": "c",
         "regex": "c",
-        "type_traits": "c"
+        "type_traits": "c",
+        "shm.h": "c",
+        "fuse.h": "c"
     }
 }

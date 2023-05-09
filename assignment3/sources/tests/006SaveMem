@@ -5,51 +5,57 @@ cd /tmp/fuse
 
 echo "-------- Test12: Backup --------"
 
-for i in {1..5}; do echo $i > $i.hejtobiasellermads; done;
-echo the best group LOL > 4.hejtobiasellermads
+# make 5 files 
+for i in {1..5}; do echo $i > $i.hejTobiasEllerMads; done;
+echo the best group LOL > 4.hejTobiasEllerMads
 
 mkdir subfolder
 cd subfolder
-for i in {1..6}; do echo $i > $i.hejtobiasellermads; done;
+# make 6 files 
+for i in {1..6}; do echo $i > $i.hejTobiasEllerMads; done;
+
 mkdir subsubfolder 
 cd subsubfolder
+
+# make 7 files 
 for i in {1..7}; do echo $i > $i.awesomeFile; done;
+
 cd /tmp/fuse/
 echo " " 
-echo "-------- file content of 4.hejtobiasellermads --------"
-cat 4.hejtobiasellermads
+echo Content of file 4.hejTobiasEllerMads in fuse: "$(cat 4.hejTobiasEllerMads)"
 echo " " 
 sleep 2
 tree
-sleep 8
-echo "Closing fuse... "
-sleep 1
-
-echo "What backup looks like"
+sleep 9
+echo "  "
+echo "-------- backup now contains: --------"
 tree ~/fusebackup/
 echo " " 
-sleep 3
-echo "content of 4.hejtobiasellermads"
-cat 4.hejtobiasellermads
+sleep 4
+echo Content of file 4.hejTobiasEllerMads in backup: "$(cat 4.hejTobiasEllerMads)"
 echo " "
-echo "Reopening fuse to clear it from main memory... "
+echo "-------- Reopening fuse & Clearing mount point data --------"
 
 cd /tmp
-fusermount -u fuse
+diskutil unmount force ./fuse
 rm -r fuse/
 mkdir fuse
 chmod 755 fuse/
 # Change path
-cd /home/kristian/documents/4.-semester/file_system/assignment3/sources
-./lfs /tmp/fuse/ &
-sleep 1
-cd /tmp/fuse
-echo " " 
-sleep 2
+cd /Users/mikkelnielsen/Documents/Programming/dm510/file_system/assignment3/sources
+user_id=$(id -u mikkelnielsen)
+./lfs /tmp/fuse/ -o uid=$user_id
 
-echo "content of 4.hejtobiasellermads in filesystem"
-cat /tmp/fuse/4.hejtobiasellermads
-sleep 2
+
+sleep 3
+cd /tmp/fuse
+echo " "
+echo " IN FUSE: " 
+ls 
+sleep 10
+echo "Content of file 4.hejTobiasEllerMads in fuse: $(cat 4.hejTobiasEllerMads)"
+echo " " 
+sleep 3
 tree /tmp/fuse/
-sleep 2 
+sleep 3
 echo "-------- Sucess --------"

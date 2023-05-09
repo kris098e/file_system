@@ -5,18 +5,19 @@ cd test
 
 
 echo "-------- Test8: Creating dir, which name is already a file --------"
-touch a
-mkdir a
+touch LOOK_AT_ME_MUM
+mkdir LOOK_AT_ME_MUM
 echo "-------- expected error message, not created Sucess --------"
 echo  " " 
-sleep 2
+rm LOOK_AT_ME_MUM
+sleep 4
 
 echo "-------- Test9: Creating file, which name is already a dir --------"
-mkdir b
-touch b
+mkdir HI_MUM
+touch HI_MUM
 ls -la 
 echo "-------- expected dir to be there; Sucess --------"
 echo " "
 rm -r /tmp/fuse/test
-sleep 2
+sleep 4
 

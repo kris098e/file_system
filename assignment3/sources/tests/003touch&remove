@@ -5,31 +5,44 @@ cd a
 
 echo "-------- Test#4: Testing make file --------"
 touch file.txt
-tree /tmp/fuse
+ls
+sleep 4
 echo "-------- Success  --------"
 echo " " 
-sleep 2
 
 echo "-------- Test#5: Testing write data file --------"
-for i in {1..100}; do echo $i > file.txt; done;
+echo I am a long text file or something like that > file.txt 
 cat file.txt
 ls -la
+sleep 4
 echo "-------- Success  --------"
 echo  " " 
-sleep 2
 
 echo "-------- Test#6: Testing delete file with data --------"
 rm file.txt 
 ls -la 
+sleep 4
 echo "-------- Success  --------"
 echo " " 
-sleep 2
 
 echo "-------- Test#7: Testing create duplicate file names  --------"
 touch file.txt
+echo " " 
+echo "-------- file.txt created --------" 
+echo i am the orginal file > file.txt
+echo "Content of file.txt: $(cat file.txt)" 
+echo " " 
+
+sleep 3
+echo "-------- trying to duplicate it --------" 
+echo " " 
+touch file.txt
 ls -la
-cat file.txt
-echo "-------- Success  --------"
+sleep 3
+echo "Content of file.txt: $(cat file.txt)" 
+sleep 4
+echo "-------- Success: duplication not possible  --------"
+
 echo " " 
 cd /tmp/fuse/
 rm -r a

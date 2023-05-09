@@ -4,13 +4,13 @@ echo "-------- Test#3: Testing resizing --------"
 cd /tmp/fuse 
 mkdir tests
 cd tests
-for i in {1..11}; do mkdir $i; done;
+for i in {1..11}; do mkdir Folder_${i}; done;
 for i in {1..11}; do touch $i.txt; done;
-cd 1
+cd Folder_1
 for i in {1..11}; do touch $i.txt; done;
 
 tree /tmp/fuse/
-sleep 2
+sleep 4
 echo "-------- Sucess --------"
 
 echo " " 

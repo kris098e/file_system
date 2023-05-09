@@ -6,31 +6,39 @@ cd tests
 
 echo "-------- Test10: modified / access time on files --------"
 touch testfile1
-stat testfile1
-
+stat -x testfile1
+echo " "
 sleep 3
-
-echo "123" > testfile1
-stat testfile1
+echo "-------- Modifiying testfile1 --------"
+sleep 5
+echo "HAHAHAHAHAHAHAHAHAHHAAHAHAH" > testfile1
+stat -x  testfile1
 echo "-------- Sucess --------"
 echo " "
-sleep 2
+sleep 4
 
 echo "-------- Test11: modified / access time on dir --------"
 mkdir folder
-stat folder
-
+stat -x folder
+echo  " "
 sleep 3
-
+echo "-------- Modifiying folder --------"
+sleep 5
 cd folder
 touch testfile
 echo "lol" > testfile
 cd ..
-stat folder
-
-sleep 3
+stat -x folder
+echo " " 
+echo "-------- Accessing folder --------"
+cd folder
+ls 
+echo " "
+cd ..
+stat -x folder 
 
 echo "-------- Sucess --------"
+sleep 4
 echo " " 
 cd /tmp/fuse
 rm -r tests

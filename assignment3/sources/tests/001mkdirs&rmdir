@@ -1,13 +1,18 @@
 #!/bin/bash
 
+echo "--------Mounting fuse..  -------"
 cd /tmp
-fusermount -u fuse
-rm -r fuse/
+diskutil unmount force ./fuse > /dev/null
+rm -r fuse/ > /dev/null
 mkdir fuse
 chmod 755 fuse/
 # Change path
-cd /home/kristian/documents/4.-semester/file_system/assignment3/sources
-./lfs /tmp/fuse/ &
+cd /Users/mikkelnielsen/Documents/Programming/dm510/file_system/assignment3/sources
+user_id=$(id -u mikkelnielsen)
+./lfs /tmp/fuse/ -o uid=$user_id
+echo " "
+sleep 2
+
 
 cd /tmp/fuse
 
@@ -20,23 +25,24 @@ mkdir a b c d e
 cd b
 mkdir a b c d e
 cd e
-mkdir help me i am trapped 
-cd trapped 
+mkdir 001_help 002_me 003_i 004_am 005_trapped 
+cd 005_trapped 
 mkdir still trapped
 cd trapped 
 tree /tmp/fuse/
 echo "-------- Sucess --------"
 
 echo " " 
-sleep 5
-echo "--------Test#2: Removing all directories + sub-directories --------"
+sleep 4
+echo "--------Test#2: Removing all directories + sub-directories recursively --------"
 
 cd /tmp/fuse
 rm -r dirs
 
 tree /tmp/fuse/
+sleep 4
 echo "-------- Sucess --------"
-sleep 2
+
 
 echo " " 
 
