@@ -52,8 +52,8 @@ struct inode
 struct dir_data
 {
 	char *name;
-	struct dir_data *dirs; 
-	struct inode *files;   
+	struct dir_data *dirs;
+	struct inode *files;
 	int dir_count;
 	int current_dir_max_size;
 	int file_init_size;
@@ -129,7 +129,7 @@ int lfs_getattr(const char *path, struct stat *stbuf)
 	}
 	else
 		res = -ENOENT;
-		
+
 	free(info);
 	return res;
 }
@@ -157,7 +157,8 @@ static struct dir_file_info *find_info(const char *path)
 	info->item = NULL;
 
 	struct path_info *path_info = get_path_info(path);
-	if (!path_info) {
+	if (!path_info)
+	{
 		free(info);
 		return NULL; // path_info is an errno msg in this case
 	}
@@ -178,7 +179,7 @@ static struct dir_file_info *find_info(const char *path)
 		}
 		if (succeded && (i == n_tokens - 1))
 		{
-				info->found = 1;
+			info->found = 1;
 		}
 	}
 	free_path_info(path_info);
@@ -277,10 +278,11 @@ int lfs_rmdir(const char *path)
 		free_path_info(path_info);
 		return -ENOENT;
 	}
-	// parent directory of the dir we want to delete 
+	// parent directory of the dir we want to delete
 	struct dir_data *parent_dir = (struct dir_data *)info->item;
 	// check if dir is empty
-	if (parent_dir->dir_count == 0) {
+	if (parent_dir->dir_count == 0)
+	{
 		free_path_info(path_info);
 		free(info);
 		return -ENOTEMPTY;
@@ -288,27 +290,30 @@ int lfs_rmdir(const char *path)
 
 	int dir_index = 0;
 	while (dir_index < parent_dir->dir_count &&
-		   strcmp((parent_dir->dirs[dir_index]).name, path_info->tokens[path_info->n_tokens-1]))
-	{	
+		   strcmp((parent_dir->dirs[dir_index]).name, path_info->tokens[path_info->n_tokens - 1]))
+	{
 		++dir_index;
 	}
 	// dir we want to remove
 	struct dir_data *dir = &parent_dir->dirs[dir_index];
 
 	// (dir not found in parent directory || dir contains files or dirs) -> dont free
-	if (dir_index == parent_dir->dir_count || dir->dir_count != 0 || dir->file_count != 0) {
+	if (dir_index == parent_dir->dir_count || dir->dir_count != 0 || dir->file_count != 0)
+	{
 
 		free_path_info(path_info);
 		free(info);
 		return -ENOENT;
-	} else { // found, contains no files and no dirs
+	}
+	else
+	{ // found, contains no files and no dirs
 
 		free(dir->dirs);
 
 		free(dir->files);
 		free(dir->name);
 
-		parent_dir->dirs[dir_index] = parent_dir->dirs[parent_dir->dir_count-1]; // swap the last dir into the removed dirs space
+		parent_dir->dirs[dir_index] = parent_dir->dirs[parent_dir->dir_count - 1]; // swap the last dir into the removed dirs space
 		--parent_dir->dir_count;
 
 		parent_dir->modify_time = time(NULL);
@@ -320,15 +325,15 @@ int lfs_rmdir(const char *path)
 }
 
 int lfs_unlink(const char *path)
-{	
+{
 	struct path_info *path_info = get_path_info(path);
 	if (!path_info)
 		return -ENOMEM; // path_info is the errno msg at this point
 	char *creation_path = path_info->creation_path;
 
 	struct dir_file_info *info = find_info(creation_path);
-	if (!info) return -ENOMEM;
-	
+	if (!info)
+		return -ENOMEM;
 
 	if (!info->found || !info->is_dir)
 	{
@@ -339,14 +344,15 @@ int lfs_unlink(const char *path)
 	// parent dir of file to be removed
 	struct dir_data *parent_dir = (struct dir_data *)info->item;
 
-	if (parent_dir->file_count == 0) {
+	if (parent_dir->file_count == 0)
+	{
 		free_path_info(path_info);
 		free(info);
 		return -ENOENT;
 	}
 	int file_index = 0;
 	while (file_index < parent_dir->file_count &&
-		   strcmp((parent_dir->files[file_index]).name, path_info->tokens[path_info->n_tokens-1]))
+		   strcmp((parent_dir->files[file_index]).name, path_info->tokens[path_info->n_tokens - 1]))
 	{
 		++file_index;
 	}
@@ -354,17 +360,20 @@ int lfs_unlink(const char *path)
 	// file we want to remove
 	struct inode *file = &parent_dir->files[file_index];
 
-	// (file not found in parent directory 
-	if (file_index == parent_dir->file_count) {
+	// (file not found in parent directory
+	if (file_index == parent_dir->file_count)
+	{
 		free_path_info(path_info);
 		free(info);
 		return -ENOENT;
-	} else { // found file 
+	}
+	else
+	{ // found file
 		free(file->content);
 		free(file->name);
-		parent_dir->files[file_index] = parent_dir->files[parent_dir->file_count-1]; // swap the last fille into the removed files space
+		parent_dir->files[file_index] = parent_dir->files[parent_dir->file_count - 1]; // swap the last fille into the removed files space
 		--parent_dir->file_count;
-		
+
 		parent_dir->modify_time = time(NULL); // when removed file, update modify time
 		free_path_info(path_info);
 		free(info);
@@ -500,8 +509,9 @@ static int make_dir(struct dir_data *dir, char *name)
 	struct dir_data *new_dir = &dir->dirs[dir->dir_count];
 
 	char *malloced_name = malloc(sizeof(char) * strlen(name) + 1);
-	if (!malloced_name) return -ENOMEM;
-	
+	if (!malloced_name)
+		return -ENOMEM;
+
 	strcpy(malloced_name, name);
 
 	// set fields of new dir
@@ -540,8 +550,9 @@ static int make_nod(struct dir_data *dir, char *name)
 {
 	struct inode *new_file = &dir->files[dir->file_count];
 	char *malloced_name = malloc(sizeof(char) * strlen(name) + 1);
-	if (!malloced_name) return -ENOMEM;
-	
+	if (!malloced_name)
+		return -ENOMEM;
+
 	strcpy(malloced_name, name);
 
 	// set fields of new dir
@@ -638,7 +649,7 @@ int lfs_truncate(const char *path, off_t length)
 		struct inode *file = (struct inode *)info->item;
 		file->content = realloc(file->content, length);
 		file->size_allocated = length;
-		if(length < file->content_size)
+		if (length < file->content_size)
 			file->content_size = length;
 		free(info);
 		return 0;
@@ -707,7 +718,7 @@ static struct path_info *get_path_info(const char *path)
 	// behave differently when making directories in root
 	// when given mkdir path an extra '/' is given if not in root. If in root the extra '/' is not given
 	int remove_extra_slash = n_tokens == 1 ? 0 : -1;
-	
+
 	// Add space for terminating byte, and get parent dir of current dir
 	// /foo/bar - /bar = /foo + '\0' = /foo\0
 	char *creation_path = malloc((strlen(path) - strlen(tokens[n_tokens - 1]) + 1 + remove_extra_slash) * sizeof(char));
@@ -722,7 +733,7 @@ static struct path_info *get_path_info(const char *path)
 
 	// copy parent dir of current dir to creation_path
 	memcpy(creation_path, path, (strlen(path) - strlen(tokens[n_tokens - 1]) + remove_extra_slash));
-	
+
 	// add null-terminating byte to creation_path
 	creation_path[strlen(path) - strlen(tokens[n_tokens - 1]) + remove_extra_slash] = '\0';
 
@@ -742,15 +753,19 @@ static void free_path_info(struct path_info *path_info)
 	free(path_info);
 }
 
-static int init_root() {
+static int init_root()
+{
 	root = malloc(sizeof(struct dir_data));
-	if(!root) return -ENOMEM;
+	if (!root)
+		return -ENOMEM;
 	root->dir_count = 0;
 	root->dirs = malloc(sizeof(struct dir_data) * 10); // base size of 10
-	if(!root->dirs) return -ENOMEM;
+	if (!root->dirs)
+		return -ENOMEM;
 	root->file_count = 0;
 	root->files = malloc(sizeof(struct inode) * 10); // base size of 10
-	if(!root->files) return -ENOMEM;
+	if (!root->files)
+		return -ENOMEM;
 	root->name = "/";
 	root->current_dir_max_size = 10;
 	root->file_init_size = 10;
@@ -761,59 +776,63 @@ static int init_root() {
 	return 0;
 }
 
-
 int main(int argc, char *argv[])
-{	
-	//int cp_error_code;
-  int id, shmid;
+{
+	// int cp_error_code;
+	int id, shmid;
 	int err = 0;
-	if (!root) err = init_root(); 
+	if (!root)
+		err = init_root();
 
-  // Create a shared memory segment
-  shmid = shmget(IPC_PRIVATE, sizeof(int), 0600);
-  if (shmid < 0) {
-    err = 1;
-  }
+	// Create a shared memory segment
+	shmid = shmget(IPC_PRIVATE, sizeof(int), 0666);
+	if (shmid < 0)
+	{
+		err = 1;
+	}
 
-  // Attach to the shared memory segment
-  shared_variable = (int *) shmat(shmid, NULL, 0);
-  if (shared_variable == (int *) -1) {
-    err = 1;
-  }
+	// Attach to the shared memory segment
+	shared_variable = (int *)shmat(shmid, NULL, 0);
+	if (shared_variable == (int *)-1)
+	{
+		err = 1;
+	}
 
-  // init shared variable
+	// init shared variable
 	*shared_variable = 0;
 
-  id = fork();
-  if (id == 0 && !err) {
-    // stall to startup fuse before loading backup
-    while(!(*shared_variable))
-    {
-		__sync_synchronize(); // memory barrie	
-    }
+	id = fork();
+	if (id == 0 && !err)
+	{
+		// stall to startup fuse before loading backup
+		while (!(*shared_variable))
+		{
+			__sync_synchronize(); // memory barrie
+		}
 
+		system("mkdir ~/fusebackup");
+		system("cp -r ~/fusebackup/* /tmp/fuse/ ");
+		printf("After the first while\n");
 
-    system("mkdir ~/fusebackup");
-    system("cp -R ~/fusebackup/ /tmp/fuse/ ");
-    printf("After the first while\n");
+		while (*shared_variable)
+		{
+			__sync_synchronize(); // memory barrier
+			system("rsync -a --delete /tmp/fuse/ ~/fusebackup/");
+			sleep(1);
+		}
+		exit(0);
+	}
+	else
+	{
+		fuse_main(argc, argv, &lfs_oper);
+		*shared_variable = 0;
+	}
 
-    while(*shared_variable) {
-		__sync_synchronize(); // memory barrier
-		system("rsync -a --delete /tmp/fuse/ ~/fusebackup/");
-		sleep(1);
-    }
-    exit(0);
-    } else {
-    fuse_main(argc, argv, &lfs_oper);
-    *shared_variable = 0;
-  }
+	// Detach from the shared memory segment
+	shmdt(shared_variable);
 
-  // Detach from the shared memory segment
-  shmdt(shared_variable);
+	// Destroy the shared memory segment
+	shmctl(shmid, IPC_RMID, NULL);
 
-  // Destroy the shared memory segment
-  shmctl(shmid, IPC_RMID, NULL);
-
-
-  return err;
+	return err;
 }
