@@ -6,6 +6,9 @@
 #include <limits.h>
 #include <unistd.h>
 #include <sys/shm.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
 
 int lfs_getattr(const char *, struct stat *);
 int lfs_readdir(const char *, void *, fuse_fill_dir_t, off_t, struct fuse_file_info *);
@@ -38,9 +41,9 @@ static struct fuse_operations lfs_oper = {
 struct inode
 { // used like the Inode of the specific file
 	char *name;
-	__time_t access_time;
-	__time_t modify_time;
-	__mode_t mode;
+	time_t access_time;
+	time_t modify_time;
+	mode_t mode;
 	char *content;
 	int size_allocated;
 	int content_size;
@@ -56,9 +59,9 @@ struct dir_data
 	int file_init_size;
 	int file_count;
 	int current_file_max_size;
-	__mode_t mode;
-	__time_t access_time;
-	__time_t modify_time;
+	mode_t mode;
+	time_t access_time;
+	time_t modify_time;
 };
 
 struct dir_file_info
@@ -94,6 +97,8 @@ int lfs_getattr(const char *path, struct stat *stbuf)
 {
 	*shared_variable = 1;
 	int res = 0;
+	__sync_synchronize(); // memory barrier
+	printf("In getattr shared var: %d\n", *shared_variable);
 
 	memset(stbuf, 0, sizeof(struct stat));
 
@@ -116,7 +121,7 @@ int lfs_getattr(const char *path, struct stat *stbuf)
 	{
 		struct inode *file = (struct inode *)info->item;
 
-		stbuf->st_mode = __S_IFREG | 0777;
+		stbuf->st_mode = S_IFREG | 0777;
 		stbuf->st_nlink = 1;
 		stbuf->st_atime = file->access_time;
 		stbuf->st_mtime = file->modify_time;
@@ -520,7 +525,7 @@ static int make_dir(struct dir_data *dir, char *name)
 	new_dir->current_dir_max_size = 10;
 	new_dir->file_init_size = 10;
 	new_dir->file_count = 0;
-	new_dir->mode = __S_IFDIR | 0755;
+	new_dir->mode = S_IFDIR | 0755;
 	new_dir->current_file_max_size = 10;
 	new_dir->access_time = time(NULL);
 	new_dir->modify_time = time(NULL);
@@ -543,7 +548,7 @@ static int make_nod(struct dir_data *dir, char *name)
 	new_file->name = malloced_name;
 	new_file->access_time = time(NULL);
 	new_file->modify_time = time(NULL);
-	new_file->mode = __S_IFDIR | 0755;
+	new_file->mode = S_IFDIR | 0755;
 
 	new_file->content = NULL;
 	new_file->size_allocated = dir->file_init_size;
@@ -749,7 +754,7 @@ static int init_root() {
 	root->name = "/";
 	root->current_dir_max_size = 10;
 	root->file_init_size = 10;
-	root->mode = __S_IFDIR | 0755;
+	root->mode = S_IFDIR | 0755;
 	root->current_file_max_size = 10;
 	root->access_time = time(NULL);
 	root->modify_time = time(NULL);
@@ -760,48 +765,55 @@ static int init_root() {
 int main(int argc, char *argv[])
 {	
 	//int cp_error_code;
-	int id, shmid;
+  int id, shmid;
 	int err = 0;
 	if (!root) err = init_root(); 
 
-	// Create a shared memory segment
-    shmid = shmget(IPC_PRIVATE, sizeof(int), 0600);
-    if (shmid < 0) {
-        err = 1;
-    }
+  // Create a shared memory segment
+  shmid = shmget(IPC_PRIVATE, sizeof(int), 0600);
+  if (shmid < 0) {
+    err = 1;
+  }
 
-    // Attach to the shared memory segment
-    shared_variable = (int *) shmat(shmid, NULL, 0);
-    if (shared_variable == (int *) -1) {
-        err = 1;
-    }
+  // Attach to the shared memory segment
+  shared_variable = (int *) shmat(shmid, NULL, 0);
+  if (shared_variable == (int *) -1) {
+    err = 1;
+  }
 
-	// init shared variable
+  // init shared variable
 	*shared_variable = 0;
 
-
-	id = fork();
-	if (id == 0 && !err) {
-		while(!shared_variable);
-		system("mkdir ~/fusebackup 2> /dev/null");
-		system("cp -r ~/fusebackup/* /tmp/fuse/ 2> /dev/null");
-		
-
-		while(shared_variable) {
-			system("rsync -a --delete /tmp/fuse/ ~/fusebackup/ 2> /dev/null");
-			sleep(10);
-		}
-	} else {
-		fuse_main(argc, argv, &lfs_oper);
-		*shared_variable = 0;
-	}
-
-	// Detach from the shared memory segment
-    shmdt(shared_variable);
-
-    // Destroy the shared memory segment
-    shmctl(shmid, IPC_RMID, NULL);
+  id = fork();
+  if (id == 0 && !err) {
+    // stall to startup fuse before loading backup
+    while(!(*shared_variable))
+    {
+		__sync_synchronize(); // memory barrie	
+    }
 
 
-	return err;
+    system("mkdir ~/fusebackup");
+    system("cp -R ~/fusebackup/ /tmp/fuse/ ");
+    printf("After the first while\n");
+
+    while(*shared_variable) {
+		__sync_synchronize(); // memory barrier
+		system("rsync -a --delete /tmp/fuse/ ~/fusebackup/");
+		sleep(1);
+    }
+    exit(0);
+    } else {
+    fuse_main(argc, argv, &lfs_oper);
+    *shared_variable = 0;
+  }
+
+  // Detach from the shared memory segment
+  shmdt(shared_variable);
+
+  // Destroy the shared memory segment
+  shmctl(shmid, IPC_RMID, NULL);
+
+
+  return err;
 }
