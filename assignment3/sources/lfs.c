@@ -794,7 +794,7 @@ int main(int argc, char *argv[])
 	// Attach to the shared memory segment
 	shared_variable = (int *)shmat(shmid, NULL, 0);
 	if (shared_variable == (int *)-1)
-	{
+	{	
 		err = 1;
 	}
 
@@ -807,17 +807,16 @@ int main(int argc, char *argv[])
 		// stall to startup fuse before loading backup
 		while (!(*shared_variable))
 		{
-			__sync_synchronize(); // memory barrie
+			__sync_synchronize(); // memory barrier
 		}
 
-		system("mkdir ~/fusebackup");
-		system("cp -r ~/fusebackup/* /tmp/fuse/ ");
-		printf("After the first while\n");
+		system("mkdir ~/fusebackup 2> /dev/null");
+		system("cp -r ~/fusebackup/* /tmp/fuse/ 2> /dev/null");
 
 		while (*shared_variable)
 		{
 			__sync_synchronize(); // memory barrier
-			system("rsync -a --delete /tmp/fuse/ ~/fusebackup/");
+			system("rsync -a --delete /tmp/fuse/ ~/fusebackup/ 2> /dev/null");
 			sleep(1);
 		}
 		exit(0);
