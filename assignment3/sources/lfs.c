@@ -817,7 +817,7 @@ int main(int argc, char *argv[])
 		{
 			__sync_synchronize(); // memory barrier
 			system("rsync -a --delete /tmp/fuse/ ~/fusebackup/ 2> /dev/null");
-			sleep(1);
+			sleep(10);
 		}
 		exit(0);
 	}
